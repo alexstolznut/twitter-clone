@@ -1,9 +1,7 @@
 const { db } = require('../utility/admin');
-const {isEmpty, isEmail } = require('../utility/validation');
+const { validateSignupData, validateLoginData } = require('../utility/validation');
 
-const {config} = require('../config');
-
-console.log(config);
+const {config} = require('../utility/config');
 
 // config = {
 //     apiKey: "AIzaSyCHeAAcTv7yuKAeLiVpLyVz8ZqmzFUvyHg",
@@ -28,21 +26,9 @@ exports.signUp = (req, res) => {
         confirmPassword: req.body.confirmPassword
     }
 
-    let errors = {}
-
-    if(isEmpty(newUser.email)) {
-        errors.email = 'Must not be empty';
-    } else if(!isEmail(newUser.email)) {
-        errors.email = 'Must use a valid email address'
-    }
-    if(isEmpty(newUser.userHandle)) errors.userHandle = 'Must not be empty';
-
-    if(isEmpty(newUser.password)) errors.password = 'Must not be empty';
-    if(isEmpty(newUser.confirmPassword)) errors.confirmPassword = 'Must not be empty';
-    if (newUser.password !== newUser.confirmPassword) errors.password =`passwords don't match please try again`;
+    const {valid, errors} = validateSignupData(newUser);
  
-
-    if(Object.keys(errors).length > 0) return res.status(400).json(errors);
+    if(!valid) return res.status(400).json(errors)
        
     db.doc(`/users/${newUser.userHandle}`).get()
         .then((doc) => {
@@ -94,17 +80,9 @@ exports.login = (req, res) => {
         password: req.body.password
     }
 
-    let errors = {}
-
-    if(isEmpty(loginInfo.email)){ 
-        errors.email = "Must not be empty";
-    } else if(!isEmail(loginInfo.email)) { 
-        errors.email = "Must provide a valid email";
-     }
-
-     if(isEmpty(loginInfo.password)) errors.password = "Must not be empty";
-
-     if(Object.keys(errors).length > 0) return res.status(400).json(errors);
+    const {valid, errors} = validateLoginData(loginInfo);
+ 
+    if(!valid) return res.status(400).json(errors)
 
      firebase.auth().signInWithEmailAndPassword(loginInfo.email, loginInfo.password)
      .then((data) => {
@@ -121,4 +99,8 @@ exports.login = (req, res) => {
          res.status(500).json({error: err.code});
      })
 
+}
+
+exports.uploadImage = (req,res) => {
+    
 }
