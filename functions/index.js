@@ -23,7 +23,7 @@ app.post('/scream', fbAuth, postAScream)
 let userId, token;
 app.post('/signup', signUp);
 app.post('/login', login);
-app.post('/user/image', uploadImage);
+app.post('/user/image',fbAuth, uploadImage);
 
 
 exports.api = functions.https.onRequest(app);

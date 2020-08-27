@@ -1,5 +1,6 @@
-const { db } = require('../utility/admin');
+const { db, admin } = require('../utility/admin');
 const { validateSignupData, validateLoginData } = require('../utility/validation');
+const {getFileDownloadToken} = require('../utility/getFileDownloadToken');
 
 const {config} = require('../utility/config');
 
@@ -17,7 +18,7 @@ const {config} = require('../utility/config');
 const firebase = require('firebase');
 firebase.initializeApp(config);
 
-exports.signUp = (req, res) => {
+exports.signUp = async (req, res) => {
 
     const newUser = {
         email: req.body.email,
@@ -29,6 +30,10 @@ exports.signUp = (req, res) => {
     const {valid, errors} = validateSignupData(newUser);
  
     if(!valid) return res.status(400).json(errors)
+
+    const defaultProfile = 'defaultProfile.png';
+    // let fileDownloadToken = await getFileDownloadToken(defaultProfile);
+    // async () => { return fileDownloadToken = await getFileDownloadToken(defaultProfile)};
        
     db.doc(`/users/${newUser.userHandle}`).get()
         .then((doc) => {
@@ -45,15 +50,27 @@ exports.signUp = (req, res) => {
         })
         .then((data) => {
             userId = data.user.uid;
+           
             return data.user.getIdToken();
         })
         .then((idToken) => {
             token = idToken;
+           
+            
+        })
+        .then(() => {
+            return admin.storage().bucket().file('defaultProfile.png').getMetadata()
+                .then((data) => {
+                    return pictureDownloadToken = data[0].metadata.firebaseStorageDownloadTokens;
+                })
+        })
+        .then((pictureDownloadToken) => {
             return db.collection('users').doc(`/${newUser.userHandle}`).set({
                 userId: userId,
                 userHandle: newUser.userHandle,
                 email: newUser.email,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                imageUrl: `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/${defaultProfile}?alt=media&token=${pictureDownloadToken}`
             })
         })
         .then(() => {
@@ -102,5 +119,47 @@ exports.login = (req, res) => {
 }
 
 exports.uploadImage = (req,res) => {
-    
+    const BusBoy = require('busboy');
+    const path = require('path');
+    const os = require('os');
+    const fs = require('fs');
+
+    const busboy = new BusBoy({header: req.headers});
+    let imageFileName;
+    let imageToBeUploaded = {};
+
+    busboy.on('on', (fieldname, file, filename, encoding, mimetype) => {
+        console.log(`fieldname: ${fieldname}
+        file: ${file} 
+        filename: ${filename} 
+        encoding: ${encoding}
+        mimetype: ${mimetype}`)
+        const imageExtension = filname.split('.')[filename.split('.').length - 1];
+        imageFileName = `${Math.round(Math.random()*1000000000)}.${imageExtension}`;
+        const filePath = path.join(os.tmpdir(), imageFileName);
+        imageToBeUploaded = {filePath, mimetype};
+
+        file.pipe(fs.createWriteStream(filePath));
+    });
+    busboy.on('finish', ()=>{
+        admin.storage().bucket().upload(imageToBeUploaded.filePath, {
+            resumable: false,
+            metadata: {
+                metadata: {
+                    contentType: imageToBeUploaded.mimetype
+                }
+            } 
+        })
+        .then(() => {
+            const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/${imageFileName}?alt=media`;
+            return db.doc(`/users/${req.user.userHandle}`).update({imageUrl: imageUrl});
+        })
+        .then(() => {
+            return res.json({message: 'Image uploaded successfully'});
+        })
+        .catch(err => {
+            console.error(err);
+            res.status(500).json({error:err.code})
+        })
+    })
 }
