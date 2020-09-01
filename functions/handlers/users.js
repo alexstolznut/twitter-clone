@@ -1,5 +1,5 @@
 const { db, admin } = require('../utility/admin');
-const { validateSignupData, validateLoginData } = require('../utility/validation');
+const { validateSignupData, validateLoginData, reduceUserDetails } = require('../utility/validation');
 const {getFileDownloadToken} = require('../utility/getFileDownloadToken');
 
 const {config} = require('../utility/config');
@@ -16,6 +16,7 @@ const {config} = require('../utility/config');
 // };
 
 const firebase = require('firebase');
+const { user } = require('firebase-functions/lib/providers/auth');
 firebase.initializeApp(config);
 
 exports.signUp = async (req, res) => {
@@ -123,12 +124,16 @@ exports.uploadImage = (req,res) => {
     const path = require('path');
     const os = require('os');
     const fs = require('fs');
+    const uuid = require('uuid-v4');
     const busboy = new BusBoy({headers: req.headers});
     let imageFileName;
     let imageToBeUploaded = {};
- 
+    let storageToken = uuid();
+    console.log(req.user.uid);
     busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
-        if(mimetype !== 'image/jpeg' && mimetype !== 'image/png') return res.status(400).json({error:'Please select a png or jpeg to upload'});
+        if(mimetype !== 'image/jpeg' && mimetype !== 'image/png') {
+            return res.status(400).json({error:'Please select a png or jpeg to upload'});
+        }
         console.log(`fieldname: ${fieldname}
         file: ${file} 
         filename: ${filename} 
@@ -143,15 +148,15 @@ exports.uploadImage = (req,res) => {
 
         file.pipe(fs.createWriteStream(filePath));
     });
-    busboy.on('finish', ()=>{
+    busboy.on('finish', () => {
         //TODO: Figure out what access token isn't aded on upload and firestore viewing URL is messed up
         console.log(admin.storage().bucket().upload(imageToBeUploaded.filePath));
         admin.storage().bucket().upload(imageToBeUploaded.filePath, {
             resumable: false,
             metadata: {
                 metadata: {
-                    contentType: imageToBeUploaded.mimetype
-        
+                    contentType: imageToBeUploaded.mimetype,
+                    firebaseStorageDownloadTokens: `${storageToken}`
             } 
         }
         })
@@ -168,4 +173,33 @@ exports.uploadImage = (req,res) => {
         })
     })
     busboy.end(req.rawBody);
+}
+
+exports.addUserDetails = (req, res) => {
+    const userDetails = reduceUserDetails(req.body);
+    
+    if(userDetails.bio > 280) return res.status(402).json({error: 'Bio is greater than 280 characters'});
+
+    db.collection('users').doc(req.user.handle).update(userDetails)
+    .then(() => {
+        return res.json({message:`${req.user.handle}'s info was updated`})
+    })
+    .catch((err) => {
+        console.error(err);
+        return res.status(500).json({error:err.code});
+    })
+
+
+    
+}
+
+exports.getEntireBucket = (req, res) => {
+    // let storageRef = admin.storage().ref()
+    admin.storage().bucket().getFiles()
+    .then((data)=>{
+        res.json(data[0]);
+    })
+    .catch((err) => {
+        console.log(err);
+    })
 }

@@ -4,7 +4,7 @@ const fbAuth = require('./utility/fbAuth');
 
 const {getAllScreams, postAScream} = require('./handlers/screams');
 
-const { signUp, login, uploadImage } = require('./handlers/users');
+const { signUp, login, uploadImage, getEntireBucket, addUserDetails } = require('./handlers/users');
 
 
 
@@ -24,6 +24,9 @@ let userId, token;
 app.post('/signup', signUp);
 app.post('/login', login);
 app.post('/user/image',fbAuth, uploadImage);
+app.get('/user/bucket', fbAuth, getEntireBucket);
+
+app.post('/user', fbAuth, addUserDetails)
 
 
 exports.api = functions.https.onRequest(app);
