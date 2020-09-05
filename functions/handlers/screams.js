@@ -35,3 +35,81 @@ exports.postAScream = (req, res) => {
         })
         .catch((err) => console.error(err))
 }
+
+exports.getScream = (req, res) => {
+    let screamData = {}
+    db.collection('screams').doc(req.params.screamId).get()
+    .then((doc) => {
+        if(doc.exists){
+            screamData = doc.data();
+            console.log(doc.id);
+            screamData.screamId = req.params.screamId;
+            return db.collection('comments').orderBy('createdAt','desc').where('screamId','==', req.params.screamId).get();
+        } else {
+            return res.status(404).json({message:`this scream doesn't exist`});
+        }
+    })
+    .then((data) => {
+        screamData.comments = [];
+        data.forEach((comments)=>{
+            screamData.comments.push(comments.data());
+        });
+        return db.collection('likes').where('screamId', '==', req.params.screamId).get();
+    })
+    .then((data) => {
+        screamData.likes = [];
+        data.forEach((likes) => {
+            screamData.likes.push(likes.data())
+        });
+        return screamData;
+    })
+    .then((data)=>{
+        res.json(data);
+    })
+    .catch((err) => {
+        console.error(err);
+        res.json({error: err.code});
+    })
+}
+
+exports.commentOnScream = (req, res) => {
+    const comment = {
+        userHandle: req.user.handle,
+        screamId: req.params.screamId,
+        body: req.body.body,
+        createdAt: new Date().toISOString()
+    }
+
+    db.collection('screams').doc(req.params.screamId).get()
+    .then((doc) => {
+        if(doc.exists) {
+            return db.collection('comments').add(comment);
+        } else {
+            return res.status(401).json({error: `scream doesn't exist`});
+        }
+    })
+    .then((data)=> {
+        return res.json(data[0]);
+    })
+    .catch((err) => {
+        console.error(err);
+        res.status(500).json({error: err.code});
+    });
+}
+exports.deleteScream = (req, res) => {
+    db.collection('screams').doc(req.params.screamId).get()
+    .then((doc) => {
+        if(doc.exists) {
+            db.collection('screams').doc(req.params.screamId).delete();
+        } else {
+            return res.status(401).json({message:`this scream doesn't exist`});
+        }
+    })
+    .then(()=>{
+        return res.json({message:`scream has been deleted`});
+    })
+    .catch((err) => {
+        console.error(err);
+        res.status(500).json({error:err.code})
+    })
+}

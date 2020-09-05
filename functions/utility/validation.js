@@ -53,7 +53,9 @@ exports.reduceUserDetails = (data) => {
     const userDetails = {}
     const errors = {};
     if(bio.trim().length > 280) errors.bio = "Bio is greater than 280 characters";
-    if(!isEmpty(bio.trim())) userDetails.bio = bio;
+    if(!isEmpty(bio.trim())) {
+        userDetails.bio = bio;
+    } 
 
     if(!isEmpty(website.trim())) {
         if(website.trim().substring(0,4) !== 'http') {
@@ -61,7 +63,7 @@ exports.reduceUserDetails = (data) => {
         } else userDetails.website = website;
     }
 
-    if(!isEmpty(location)) {
+    if(!isEmpty(location.trim())) {
         let tempString = location.split(",");
         tempString[0] = tempString[0].trim();
         tempString[1] = tempString[1].trim();

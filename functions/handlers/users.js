@@ -177,8 +177,14 @@ exports.uploadImage = (req,res) => {
 
 exports.addUserDetails = (req, res) => {
     const userDetails = reduceUserDetails(req.body);
-    
-    if(userDetails.bio > 280) return res.status(402).json({error: 'Bio is greater than 280 characters'});
+//    console.log(userDetails.bio === undefined)
+//    if(userDetails.bio === undefined){
+//        console.log('worked')
+//        db.doc(`/users/${req.user.handle}`).update({
+//            bio: firebase.firestore.FieldValue.delete()
+//        })
+//    }
+    if(userDetails.bio > 280 && !userDetails.bio.trim()=="") return res.status(402).json({error: 'Bio is greater than 280 characters'});
 
     db.collection('users').doc(req.user.handle).update(userDetails)
     .then(() => {
@@ -191,6 +197,32 @@ exports.addUserDetails = (req, res) => {
 
 
     
+}
+//Get own user details
+exports.getAuthenticatedUserDetails = (req, res) => {
+    let userData = {};
+    db.collection('users').doc(req.user.handle).get()
+    .then((doc) => {
+        if(doc.exists){
+            userData.credentials = doc.data();
+            return db.collection('likes').where('userHandle','==', req.user.handle).get();
+        } else {
+            return res.status(401).json({error: `user doesn't exist`});
+        }
+        
+    })
+    .then((likes) => {
+        userData.likes = [];
+        likes.forEach((likes)=>{
+            userData.likes.push(likes.data());
+        })
+        return res.json(userData);
+    })
+    .catch((err) => {
+        console.error(err);
+        res.status(500).json({error: err.code});
+    })
+
 }
 
 exports.getEntireBucket = (req, res) => {
