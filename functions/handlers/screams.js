@@ -73,11 +73,13 @@ exports.getScream = (req, res) => {
 }
 
 exports.commentOnScream = (req, res) => {
+    if(req.body.body.trim() === '') return res.status(400).json({error:`comment must not be empty`});
     const comment = {
         userHandle: req.user.handle,
         screamId: req.params.screamId,
         body: req.body.body,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        userImage: req.user.imageUrl
     }
 
     db.collection('screams').doc(req.params.screamId).get()
@@ -85,11 +87,11 @@ exports.commentOnScream = (req, res) => {
         if(doc.exists) {
             return db.collection('comments').add(comment);
         } else {
-            return res.status(401).json({error: `scream doesn't exist`});
+            return res.status(404).json({error: `scream doesn't exist`});
         }
     })
     .then((data)=> {
-        return res.json(data[0]);
+        return res.json(comment);
     })
     .catch((err) => {
         console.error(err);
