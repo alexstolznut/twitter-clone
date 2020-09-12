@@ -106,3 +106,51 @@ firestore.document('likes/{id}')
                                 });
                         })
         });
+
+
+exports.deleteNotificationOnUnlike = functions.firestore
+.document('likes/{id}')
+.onDelete((snapshot) => {
+        db.doc(`/screams/${snapshot.data().screamId}`)
+        .get()
+        .then((doc) => {
+                if(doc.exists) {
+                        return db.doc(`/notifications/${snapshot.id}`).delete();
+                }
+        })
+        .then(() => {
+                return;
+        })
+        .catch((err) => {
+                console.error(err);
+                return;
+        })
+})
+exports.createNotificationsOnComment = functions.firestore
+.document('comments/{id}')
+.onCreate((snapshot, context) => {
+        
+        db.doc(`screams/${snapshot.data().screamId}`)
+        .get()
+        .then((doc) => {
+                if(doc.exists) {
+                        console.log(snapshot.id, doc.exists);
+                        return db.doc(`/notifications/${snapshot.id}`)
+                        .set({
+                                createdAt: new Date().toISOString(),
+                                recipient: doc.data().userHandle,
+                                sender: snapshot.data().userHandle,
+                                type: 'comment',
+                                read: false,
+                                screamId: doc.id
+                        });
+                }
+        })
+        .then(() => {
+                return;
+        })
+        .catch((err) => {
+                console.error(err);
+                return;
+        })
+})
