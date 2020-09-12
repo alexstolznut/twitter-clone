@@ -15,6 +15,16 @@ let db = {
             body:'just a comment',
             createdAt: new Date().toISOString()
         }
+    ],
+    notifications: [
+        {
+            recipient: 'john',
+            sender: 'user',
+            type: 'like',
+            read: false,
+            screamId: 'bdsjfhsdkjfkds',
+            createdAt: new Date().toISOString()
+        }
     ]
 }
 
