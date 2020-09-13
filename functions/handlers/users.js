@@ -216,6 +216,22 @@ exports.getAuthenticatedUserDetails = (req, res) => {
         likes.forEach((likes)=>{
             userData.likes.push(likes.data());
         })
+        return db.collection('notifications').where('recipient','==', req.user.handle)
+            .orderBy('createdAt', 'desc').limit(10).get();
+    })
+    .then((notifications) => {
+        userData.notifications = [];
+        notifications.forEach((notifications) => {
+            userData.notifications.push({
+                recipient: notifications.data().recipient,
+                sender: notifications.data().sender,
+                createdAt: notifications.data().createdAt,
+                type: notifications.data().type,
+                read: notifications.data().read,
+                screamId: notifications.data().screamId,
+                notificationId: notifications.id
+            });
+        })
         return res.json(userData);
     })
     .catch((err) => {

@@ -192,6 +192,13 @@ exports.likeScream = (req, res) => {
                 screamId: req.params.screamId
             })
             .then(() => {
+                //TODO: USE length of doc array of likes matching screamId to define like count
+                //TODO: DO the same for comment count
+                // const likeCount = db.collection('likes').where('screamId', '==', req.params.screamId).get()
+                // .then((doc) => {
+                //     console.log(doc.docs.length);
+                // });
+                
                 screamData.likeCount++
                 console.log(screamData.likeCount)
                 db.doc(`/screams/${req.params.screamId}`).update({likeCount:screamData.likeCount})
