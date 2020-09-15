@@ -241,6 +241,61 @@ exports.getAuthenticatedUserDetails = (req, res) => {
 
 }
 
+exports.getUserDetails = (req, res) => {
+    userData = {}
+    db.collection('users').doc(req.params.handle).get()
+    .then((doc) => {
+        if(!doc.exists) {
+            return res.status(404).json({message: `User ${req.params.handle} doesn't exist`});
+        } else {
+            userData.user = doc.data();
+            return db.collection('screams').where('userHandle', '==', req.params.handle).orderBy('createdAt', 
+            'desc').get();
+        }
+    })
+    .then((data) => {
+        userData.screams =[];
+        data.forEach((doc) => {
+            userData.screams.push({
+                body: doc.data().body,
+                userHandle: doc.data().userHandle,
+                likeCount: doc.data().likeCount,
+                commentCount: doc.data().commentCount,
+                createdAt: doc.data().createdAt,
+                userImg: doc.data().userImg,
+                screamId: doc.id
+            });
+        });
+        return res.json(userData);
+    })
+    .catch((err) => {
+        console.error(err);
+        res.status(500).json({error: err.code});
+    })
+}
+
+exports.markNotificationsRead = (req, res) => {
+    db.collection('notifications').where('recipient','==', req.user.handle).where('read','==', false).get()
+    .then((data) => {
+        if(data.empty){
+            return res.status(404).json({message: 'no unread notifications'});
+        } else {
+            data.forEach((doc)=>{
+                db.collection('notifications').doc(doc.id).update({read:true});
+            })
+            return;
+        }
+        return;
+    })
+    .then(()=>{
+        return res.json({message: `all of ${req.user.handle}'s notifications read`});;
+    })
+    .catch((err) => {
+        console.error(err);
+        return res.status(500).json({error: err.code});
+    })
+}
+
 exports.getEntireBucket = (req, res) => {
     // let storageRef = admin.storage().ref()
     admin.storage().bucket().getFiles()

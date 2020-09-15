@@ -18,7 +18,9 @@ const {
         uploadImage,
         getEntireBucket,
         addUserDetails,
-        getAuthenticatedUserDetails
+        getAuthenticatedUserDetails,
+        getUserDetails,
+        markNotificationsRead
 } = require('./handlers/users');
 const {
         response
@@ -54,11 +56,14 @@ let userId, token;
 app.post('/signup', signUp);
 app.post('/login', login);
 app.post('/user/image', fbAuth, uploadImage);
-app.get('/user', fbAuth, getAuthenticatedUserDetails)
+app.get('/user', fbAuth, getAuthenticatedUserDetails);
+app.get('/user/:handle', getUserDetails);
+app.post('/notifications', fbAuth, markNotificationsRead)
 
 app.get('/user/bucket', fbAuth, getEntireBucket);
 
-app.post('/user', fbAuth, addUserDetails)
+app.post('/user', fbAuth, addUserDetails);
+
 
 
 exports.api = functions.https.onRequest(app);
