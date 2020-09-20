@@ -87,7 +87,7 @@ exports.signUp = async (req, res) => {
                 });
             }
             res.status(500).json({
-                error: err.code
+                general: `Something went wrong, please try again`
             });
         });
 }
@@ -111,10 +111,8 @@ exports.login = (req, res) => {
      })
      .catch((err) => {
          console.error(err);
-         if(err.code === "auth/wrong-password"){
-             res.status(403).json({general: "wrong email or password"});
-         }
-         res.status(500).json({error: err.code});
+         
+        return res.status(403).json({general: "wrong credentials please try again"});
      })
 
 }
@@ -134,11 +132,6 @@ exports.uploadImage = (req,res) => {
         if(mimetype !== 'image/jpeg' && mimetype !== 'image/png') {
             return res.status(400).json({error:'Please select a png or jpeg to upload'});
         }
-        console.log(`fieldname: ${fieldname}
-        file: ${file} 
-        filename: ${filename} 
-        encoding: ${encoding}
-        mimetype: ${mimetype}`)
         const imageExtension = filename.split('.')[filename.split('.').length - 1];
         console.log(imageExtension);
         imageFileName = `${Math.round(Math.random()*1000000000)}.${imageExtension}`;
@@ -150,7 +143,6 @@ exports.uploadImage = (req,res) => {
     });
     busboy.on('finish', () => {
         //TODO: Figure out what access token isn't aded on upload and firestore viewing URL is messed up
-        console.log(admin.storage().bucket().upload(imageToBeUploaded.filePath));
         admin.storage().bucket().upload(imageToBeUploaded.filePath, {
             resumable: false,
             metadata: {
@@ -275,25 +267,40 @@ exports.getUserDetails = (req, res) => {
 }
 
 exports.markNotificationsRead = (req, res) => {
-    db.collection('notifications').where('recipient','==', req.user.handle).where('read','==', false).get()
-    .then((data) => {
-        if(data.empty){
-            return res.status(404).json({message: 'no unread notifications'});
-        } else {
-            data.forEach((doc)=>{
-                db.collection('notifications').doc(doc.id).update({read:true});
+
+    let batch = db.batch();
+    req.body.forEach((notificationId) => {
+        const notification = db.doc(`/notifications/${notificationId}`);
+        batch.update(notification, {read: true});
+    })
+        batch.commit()
+            .then(() => {
+                return res.json({message: `Notifications marked read`});
             })
-            return;
-        }
-        return;
-    })
-    .then(()=>{
-        return res.json({message: `all of ${req.user.handle}'s notifications read`});;
-    })
-    .catch((err) => {
-        console.error(err);
-        return res.status(500).json({error: err.code});
-    })
+            .catch((err) => {
+                console.error(err);
+                return res.status(500).json({error: err.code});
+            })
+    
+    // db.collection('notifications').where('recipient','==', req.user.handle).where('read','==', false).get()
+    // .then((data) => {
+    //     if(data.empty){
+    //         return res.status(404).json({message: 'no unread notifications'});
+    //     } else {
+    //         data.forEach((doc)=>{
+    //             db.collection('notifications').doc(doc.id).update({read:true});
+    //         })
+    //         return;
+    //     }
+    //     return;
+    // })
+    // .then(()=>{
+    //     return res.json({message: `all of ${req.user.handle}'s notifications read`});;
+    // })
+    // .catch((err) => {
+    //     console.error(err);
+    //     return res.status(500).json({error: err.code});
+    // })
 }
 
 exports.getEntireBucket = (req, res) => {

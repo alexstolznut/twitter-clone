@@ -86,11 +86,11 @@ exports.createNotificationOnLike = functions.
 firestore.document('likes/{id}')
         .onCreate((snapshot, context) => {
                 const newValue = snapshot.data();
-                db.doc(`screams/${snapshot.data().screamId}`)
+                return db.doc(`screams/${snapshot.data().screamId}`)
                         .get()
                         .then((doc) => {
-                                console.log(newValue);
-                                if (doc.exists) {
+                                console.log(doc.data().userHandle == snapshot.data().userHandle);
+                                if (doc.exists && doc.data().userHandle !== snapshot.data().userHandle) {
                                         return db.doc(`/notifications/${snapshot.id}`).set({
                                                 createdAt: new Date().toISOString(),
                                                 recipient: doc.data().userHandle,
@@ -101,14 +101,8 @@ firestore.document('likes/{id}')
                                         });
                                 }
                         })
-                        .then(() => {
-                                return;
-                        })
                         .catch((err) => {
                                 console.error(err);
-                                res.status(500).json({
-                                        error: err.code
-                                });
                         })
         });
 
@@ -116,29 +110,25 @@ firestore.document('likes/{id}')
 exports.deleteNotificationOnUnlike = functions.firestore
 .document('likes/{id}')
 .onDelete((snapshot) => {
-        db.doc(`/screams/${snapshot.data().screamId}`)
+        return db.doc(`/screams/${snapshot.data().screamId}`)
         .get()
         .then((doc) => {
                 if(doc.exists) {
                         return db.doc(`/notifications/${snapshot.id}`).delete();
                 }
         })
-        .then(() => {
-                return;
-        })
         .catch((err) => {
                 console.error(err);
-                return;
         })
 })
 exports.createNotificationsOnComment = functions.firestore
 .document('comments/{id}')
 .onCreate((snapshot, context) => {
         
-        db.doc(`screams/${snapshot.data().screamId}`)
+        return db.doc(`screams/${snapshot.data().screamId}`)
         .get()
         .then((doc) => {
-                if(doc.exists) {
+                if(doc.exists && doc.data().userHandle !== snapshot.data().userHandle) {
                         console.log(snapshot.id, doc.exists);
                         return db.doc(`/notifications/${snapshot.id}`)
                         .set({
@@ -147,15 +137,85 @@ exports.createNotificationsOnComment = functions.firestore
                                 sender: snapshot.data().userHandle,
                                 type: 'comment',
                                 read: false,
-                                screamId: doc.id
+                                screamId: doc.id,
+                                body: snapshot.data().body
                         });
                 }
-        })
-        .then(() => {
-                return;
         })
         .catch((err) => {
                 console.error(err);
                 return;
         })
+});
+
+exports.onUserProfileImageChange = functions.firestore
+.document('users/{id}')
+.onUpdate((change, context) => {
+        
+       const beforeData = change.before.data();
+       const afterData = change.after.data();
+       
+       if(beforeData.imageUrl !== afterData.imageUrl) {
+        let batch = db.batch();
+               console.log(beforeData.imageUrl, afterData.imageUrl)
+               return db.collection('screams').where('userHandle', '==', afterData.userHandle).get()
+               .then((data) => {
+                data.forEach((doc) => {
+                        const scream = db.doc(`/screams/${doc.id}`);
+                        batch.update(scream, {userImage: afterData.imageUrl})
+                });
+                return db.collection('comments').where('userHandle', '==', afterData.userHandle).get();
+                      
+               })
+               .then((data) => {
+                       data.forEach((doc) => {
+                               const comment = db.doc(`/comments/${doc.id}`);
+                               batch.update(comment, {userImage: afterData.imageUrl});
+                       });
+                       return batch.commit();
+               })
+               .catch((err) => {
+                       console.error(err);
+                       response.status(500).json({error: err.code});
+               })
+       } else {
+               return true;
+       }
+});
+
+//TODO: onUserHandleChange
+
+exports.onScreamDelete = functions.firestore.document('/screams/{id}')
+.onDelete((snapshot, context) => {
+        const screamId = context.params.id;
+        
+        let batch = db.batch();
+        return db.collection('likes').where('screamId', '==', screamId).get()
+        .then((data) => {
+                data.forEach((doc) => {
+                        const like = db.collection('likes').doc(doc.id);
+                        batch.delete(like);
+                });
+                return db.collection('comments').where('screamId','==', screamId).get();
+        })
+        .then((data) => {
+                data.forEach((doc) => {
+                        const comment = db.collection('comments').doc(doc.id);
+                        batch.delete(comment);
+                });
+
+                return db.collection('notifications').where('screamId','==',screamId).get();
+        })
+        .then((data) => {
+                data.forEach((doc) => {
+                        const notification = db.collection('notifications').doc(doc.id);
+                        batch.delete(notification);
+                });
+                return batch.commit();
+        })
+        .catch((err) => {
+                console.error(err);
+        })
+
+        
 })
